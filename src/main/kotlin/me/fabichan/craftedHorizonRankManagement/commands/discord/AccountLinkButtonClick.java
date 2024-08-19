@@ -1,6 +1,7 @@
-package me.fabichan.agcminetools.Eventlistener;
+package me.fabichan.craftedHorizonRankManagement.commands.discord;
 
-import me.fabichan.agcminetools.Utils.LinkManager;
+
+import me.fabichan.craftedHorizonRankManagement.util.LinkManager;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.components.text.TextInput;

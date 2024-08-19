@@ -1,0 +1,14 @@
+general:
+  chatprefix: "§8[§b★ §lCraftedHorizon §r§b★§8]§7 "
+bot:
+  bottoken: "BOT_TOKEN"
+  guildid: "GUILD_ID"
+  registerchannelid: "REGISTER_CHANNEL_ID"
+  logchannelid: "LOG_CHANNEL_ID"
+  ranksynctimer: 10
+database:
+  host: "localhost"
+  port: 3306
+  database: "minecraft"
+  username: "dbUser"
+  password: "dbPasswort"

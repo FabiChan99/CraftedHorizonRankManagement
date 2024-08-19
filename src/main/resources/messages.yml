@@ -1,0 +1,11 @@
+general:
+  chatprefix: "§8[§b★ §lCraftedHorizon §r§b★§8]§7 "
+discord:
+  registerEmbedMessage: |
+    # Minecraft -> Discord Rangsynchronisierung
+
+    Verbinde deinen Minecraft Account, um deinen Minecraft-Rang mit Discord zu synchronisieren. Das funktioniert bei uns unabhängig vom Rang.
+    
+    
+    Mit freundlichen Grüßen,
+    Dein CraftedHorizon-Team

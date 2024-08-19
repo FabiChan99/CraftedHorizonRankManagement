@@ -1,0 +1,7 @@
+ranks:
+  administrator:
+    permission: "discordrank.administrator"
+    roleId: "123456789"
+  moderator:
+    permission: "discordrank.moderator"
+    roleId: "123456789"

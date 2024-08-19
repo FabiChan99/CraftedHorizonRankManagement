@@ -1,52 +1,49 @@
-package me.fabichan.craftedHorizonRankManagement.util
+package me.fabichan.craftedHorizonRankManagement.util;
 
-import me.fabichan.craftedHorizonRankManagement.CraftedHorizonRankManagement
-import org.bukkit.Bukkit
-import org.bukkit.OfflinePlayer
-import org.bukkit.plugin.java.JavaPlugin
-import java.text.SimpleDateFormat
-import java.util.*
+import me.fabichan.craftedHorizonRankManagement.CraftedHorizonRankManagement;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.plugin.java.JavaPlugin;
 
-class McUtil(private var BukkitPlugin: CraftedHorizonRankManagement) {
-    init {
-        dbclient = DbUtil.getInstance(BukkitPlugin)
+import java.text.SimpleDateFormat;
+import java.util.*;
+
+public class McUtil {
+    private static DbUtil dbclient;
+    private static CraftedHorizonRankManagement BukkitPlugin;
+
+    public McUtil(CraftedHorizonRankManagement plugin) {
+        dbclient = DbUtil.getInstance(plugin);
+        BukkitPlugin = plugin;
     }
 
-    companion object {
-        private lateinit var dbclient: DbUtil
-
-        fun getNameByUUID(uuid: UUID): String? {
-            val offlinePlayer = Bukkit.getOfflinePlayer(uuid)
-            return if (offlinePlayer.hasPlayedBefore()) {
-                offlinePlayer.name
-            } else {
-                "Unknown"
-            }
-        }
-
-        val allPlayersEverPlayedAsOfflinePlayer: List<OfflinePlayer>
-            get() {
-                val players: List<OfflinePlayer> = ArrayList()
-                val allPlayers = Bukkit.getOfflinePlayers()
-
-                for (player in allPlayers) {
-                    if (player.hasPlayedBefore()) {
-                        (players as ArrayList).add(player)
-                    }
-                }
-
-                return players
-            }
-
-        fun getLastOnline(uuid: UUID): String {
-            val offlinePlayer = Bukkit.getOfflinePlayer(uuid)
-            if (offlinePlayer.hasPlayedBefore()) {
-                val lastPlayed = Date(offlinePlayer.lastPlayed)
-                val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-                return dateFormat.format(lastPlayed)
-            } else {
-                return "Unknown Date"
-            }
+    public static String getNameByUUID(UUID uuid) {
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
+        if (offlinePlayer != null && offlinePlayer.hasPlayedBefore()) {
+            return offlinePlayer.getName();
+        } else {
+            return "Unknown";
         }
     }
+
+    public static List<OfflinePlayer> getAllPlayersEverPlayedAsOfflinePlayer() {
+        List<OfflinePlayer> players = new ArrayList<>();
+        OfflinePlayer[] allPlayers = Bukkit.getOfflinePlayers();
+
+        Collections.addAll(players, allPlayers);
+
+        return players;
+    }
+
+    public static String getLastOnline(UUID uuid) {
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
+        if (offlinePlayer != null && offlinePlayer.hasPlayedBefore()) {
+            Date lastPlayed = new Date(offlinePlayer.getLastPlayed());
+            SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            return dateFormat.format(lastPlayed);
+        } else {
+            return "Unknown Date";
+        }
+    }
+
 }

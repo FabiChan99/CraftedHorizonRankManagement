@@ -1,9 +1,11 @@
-package me.fabichan.agcminetools.Eventlistener;
+package me.fabichan.craftedHorizonRankManagement.commands.minecraft;
 
-import me.fabichan.agcminetools.Utils.JDAProvider;
-import me.fabichan.agcminetools.Utils.LinkManager;
+import me.fabichan.craftedHorizonRankManagement.util.JDAProvider;
+import me.fabichan.craftedHorizonRankManagement.util.LinkManager;
+import me.fabichan.craftedHorizonRankManagement.util.RankSyncTask;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.Guild;
+import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.Channel;
 import org.bukkit.Bukkit;
@@ -14,9 +16,12 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitRunnable;
+import me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.Companion.*;
 
 import java.util.Objects;
 import java.util.UUID;
+
+import static me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.syncRoles;
 
 public class MinecraftPlayerJoinListener implements Listener {
 
@@ -25,7 +30,7 @@ public class MinecraftPlayerJoinListener implements Listener {
 
     public MinecraftPlayerJoinListener(JavaPlugin plugin) {
         this.plugin = plugin;
-        this.jda = JDAProvider.getJDA();
+        this.jda = JDAProvider.INSTANCE.getJda();
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -38,46 +43,18 @@ public class MinecraftPlayerJoinListener implements Listener {
                     return;
                 }
                 Player player = event.getPlayer();
-                UUID playerUuid = player.getUniqueId();
-                if (!LinkManager.isLinked(playerUuid)) {
-                    String linkCode = LinkManager.generateLinkCode(playerUuid);
-                    Guild guild = jda.getGuildById(Objects.requireNonNull(plugin.getConfig().getString("bot.guildid")));
-                    if (guild == null) {
-                        plugin.getLogger().severe("Guild-ID ist nicht gesetzt oder der Bot ist nicht auf dem Server!");
-                        return;
-                    }
-
-                    Channel linkChannel = guild.getTextChannelById(Objects.requireNonNull(plugin.getConfig().getString("bot.registerchannelid")));
-                    if (linkChannel == null) {
-                        plugin.getLogger().severe("LinkChannel ist nicht gesetzt oder existiert nicht auf dem Server!");
-                        return;
-                    }
-
-                    String linkChannelName = linkChannel.getName();
-                    String kickMessage = "Bitte verbinde deinen Discord-Account mit dem Minecraft-Account! \n\nKlicke dazu in " + linkChannelName + " den Button \"Verlinken\" und gebe dort den Code " + linkCode + " ein. Der Code ist 10 Minuten ab der Erstellung gültig.";
-                    Bukkit.getScheduler().runTask(plugin, () -> player.kickPlayer(kickMessage));
-                } else if (LinkManager.isLinked(playerUuid)) {
-                    Guild guild = jda.getGuildById(Objects.requireNonNull(plugin.getConfig().getString("bot.guildid")));
-                    if (guild == null) {
-                        plugin.getLogger().severe("Guild-ID ist nicht gesetzt oder der Bot ist nicht auf dem Server!");
-                        return;
-                    }
-                    String discordId = LinkManager.getDiscordId(playerUuid);
-                    User user = jda.retrieveUserById(Objects.requireNonNull(discordId)).complete();
-                    try {
-                        if (guild.retrieveBan(user).complete() != null) {
-                            String KickMessage = "Du wurdest von unserem Discord-Server gebannt! Es gibt keine Möglichkeit ohne Server-Mitgliedschaft auf dem Minecraft-Server zu spielen.";
-                            Bukkit.getScheduler().runTask(plugin, () -> player.kickPlayer(KickMessage));
-                            return;
-                        }
-                    } catch (Exception ignored) {
-                    }
-
-                    if (!guild.isMember(user)) {
-                        String KickMessage = "Du bist nicht auf unserem Discord-Server! Bitte joine unserem Discord-Server, um auf dem Minecraft-Server spielen zu können.";
-                        Bukkit.getScheduler().runTask(plugin, () -> player.kickPlayer(KickMessage));
-                    }
+                UUID uuid = player.getUniqueId();
+                String discordId = LinkManager.getDiscordId(uuid);
+                if (discordId == null) {
+                    return;
                 }
+                Member member = Objects.requireNonNull(jda.getGuildById(Objects.requireNonNull(plugin.getConfig().getString("bot.guildid")))).getMemberById(discordId);
+                // run sync 
+                if (member == null) {
+                    return;
+                }
+                plugin.getLogger().info("Syncing roles for " + member.getUser().getAsTag());
+                syncRoles(member);
             }
         }.runTaskAsynchronously(plugin);
     }

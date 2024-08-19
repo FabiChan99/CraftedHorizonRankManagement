@@ -1,6 +1,6 @@
-package me.fabichan.agcminetools.Utils;
+package me.fabichan.craftedHorizonRankManagement.util;
 
-import org.bukkit.plugin.java.JavaPlugin;
+import me.fabichan.craftedHorizonRankManagement.CraftedHorizonRankManagement;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
@@ -11,9 +11,9 @@ import java.util.logging.Level;
 public class MessageConfigManager {
 
     private static CustomConfigManager configManager;
-    private static JavaPlugin plugin;
+    private static CraftedHorizonRankManagement plugin;
 
-    public MessageConfigManager(JavaPlugin plugin) {
+    public MessageConfigManager(CraftedHorizonRankManagement plugin) {
         MessageConfigManager.plugin = plugin;
         configManager = new CustomConfigManager(plugin, "messages.yml");
         System.out.println("Loading messages.yml");

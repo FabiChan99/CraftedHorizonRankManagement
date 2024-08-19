@@ -1,16 +1,20 @@
-package me.fabichan.agcminetools.Eventlistener;
+package me.fabichan.craftedHorizonRankManagement.commands.discord;
 
-import me.fabichan.agcminetools.Utils.LinkManager;
+
+import me.fabichan.craftedHorizonRankManagement.util.LinkManager;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.modals.ModalMapping;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
-import static me.fabichan.agcminetools.Utils.LinkManager.LinkAndInvalidateCode;
-import static me.fabichan.agcminetools.Utils.McUtil.getNameByUUID;
+import static me.fabichan.craftedHorizonRankManagement.util.LinkManager.LinkAndInvalidateCode;
+import static me.fabichan.craftedHorizonRankManagement.util.McUtil.getNameByUUID;
+import static me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.syncRoles;
+
 
 public class AccountLinkSubmitModalEvent extends ListenerAdapter {
 
@@ -35,9 +39,12 @@ public class AccountLinkSubmitModalEvent extends ListenerAdapter {
                     }
                     LinkAndInvalidateCode(discordId, minecraftUuid, linkCode);
                     String minecraftName = getNameByUUID(minecraftUuid);
-                    // format message
                     String message = String.format("Dein Discord-Account wurde mit dem Minecraft-Account `%s` verknüpft!", minecraftName);
                     event.reply(message).setEphemeral(true).queue();
+                    // as bukkitrunnable
+                    plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
+                        syncRoles(Objects.requireNonNull(event.getMember()));
+                    });
                 } else {
                     event.reply("Der Link-Code ist ungültig!").setEphemeral(true).queue();
                 }

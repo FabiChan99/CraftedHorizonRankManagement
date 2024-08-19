@@ -1,0 +1,17 @@
+name: CraftedHorizonRankManagement
+version: '1.0-SNAPSHOT'
+main: me.fabichan.craftedHorizonRankManagement.CraftedHorizonRankManagement
+api-version: '1.20'
+authors: [ Fabi-Chan ]
+load: STARTUP
+description: CraftedHorizon Rangverwaltung
+depend:
+  - Vault
+  - LuckPerms
+
+commands:
+  ranksync:
+    description: Synchronisiert die Ränge zwischen Discord und dem Minecraft-Server.
+    usage: /ranksync
+    aliases:
+      - linkdiscord

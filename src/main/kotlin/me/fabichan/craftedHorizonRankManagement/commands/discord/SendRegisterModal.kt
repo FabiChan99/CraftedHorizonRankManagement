@@ -1,4 +1,4 @@
-package me.fabichan.craftedHorizonRankManagement.Commands.Discord
+package me.fabichan.craftedHorizonRankManagement.commands.discord
 
 import me.fabichan.craftedHorizonRankManagement.util.Interfaces.ICommand
 import me.fabichan.craftedHorizonRankManagement.util.MessageConfigManager

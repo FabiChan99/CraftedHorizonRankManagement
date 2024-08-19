@@ -1,6 +1,6 @@
-package me.fabichan.agcminetools.Utils;
+package me.fabichan.craftedHorizonRankManagement.util;
 
-import me.fabichan.agcminetools.Utils.Interfaces.ICommand;
+import me.fabichan.craftedHorizonRankManagement.util.Interfaces.ICommand;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 

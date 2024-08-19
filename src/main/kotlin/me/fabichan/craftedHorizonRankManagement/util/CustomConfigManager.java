@@ -1,8 +1,10 @@
-package me.fabichan.agcminetools.Utils;
+package me.fabichan.craftedHorizonRankManagement.util;
 
+import me.fabichan.craftedHorizonRankManagement.CraftedHorizonRankManagement;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
+
 
 import java.io.File;
 import java.io.InputStream;
@@ -12,12 +14,12 @@ import java.util.logging.Level;
 
 public class CustomConfigManager {
 
-    private final JavaPlugin plugin;
+    private final CraftedHorizonRankManagement plugin;
     private final String configName;
     private FileConfiguration customConfig = null;
     private File customConfigFile = null;
 
-    public CustomConfigManager(JavaPlugin plugin, String configName) {
+    public CustomConfigManager(CraftedHorizonRankManagement plugin, String configName) {
         this.plugin = plugin;
         this.configName = configName;
     }
@@ -59,6 +61,7 @@ public class CustomConfigManager {
             customConfigFile = new File(plugin.getDataFolder(), configName);
         }
         if (!customConfigFile.exists()) {
+            plugin.getLogger().info("Saving default config: " + configName);
             plugin.saveResource(configName, false);
         }
     }

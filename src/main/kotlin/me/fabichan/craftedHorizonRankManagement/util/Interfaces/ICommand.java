@@ -1,26 +1,27 @@
-package me.fabichan.craftedHorizonRankManagement.util.Interfaces
+package me.fabichan.craftedHorizonRankManagement.util.Interfaces;
 
-import net.dv8tion.jda.api.Permission
-import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
-import net.dv8tion.jda.api.interactions.commands.build.CommandData
+import net.dv8tion.jda.api.Permission;
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
+import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 
-interface ICommand {
-    val name: String?
+import java.util.List;
+import java.util.Objects;
 
-    val description: String?
+public interface ICommand {
+    String getName();
 
-    fun handle(event: SlashCommandInteractionEvent?)
+    String getDescription();
 
-    val commandData: CommandData?
+    void handle(SlashCommandInteractionEvent event);
 
-    val requiredPermissions: List<Permission?>
+    CommandData getCommandData();
 
-    fun hasRequiredPermissions(event: SlashCommandInteractionEvent): Boolean {
-        if (requiredPermissions.isEmpty()) {
-            return true
+    List<Permission> getRequiredPermissions();
+
+    default boolean hasRequiredPermissions(SlashCommandInteractionEvent event) {
+        if (getRequiredPermissions().isEmpty()) {
+            return true;
         }
-        return event.member?.hasPermission(
-            requiredPermissions
-        ) ?: false
+        return Objects.requireNonNull(event.getMember()).hasPermission(getRequiredPermissions());
     }
 }
