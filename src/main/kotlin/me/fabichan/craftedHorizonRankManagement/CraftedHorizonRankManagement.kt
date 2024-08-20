@@ -3,7 +3,6 @@ package me.fabichan.craftedHorizonRankManagement
 import me.fabichan.craftedHorizonRankManagement.commands.discord.AccountLinkButtonClick
 import me.fabichan.craftedHorizonRankManagement.commands.discord.AccountLinkSubmitModalEvent
 import me.fabichan.craftedHorizonRankManagement.commands.discord.SendRegisterModal
-import me.fabichan.craftedHorizonRankManagement.commands.minecraft.MinecraftPlayerJoinListener
 import me.fabichan.craftedHorizonRankManagement.commands.minecraft.RankSyncCommandExecuter
 import me.fabichan.craftedHorizonRankManagement.commands.minecraft.UserJoinSync
 import me.fabichan.craftedHorizonRankManagement.util.*
@@ -98,10 +97,8 @@ class CraftedHorizonRankManagement : JavaPlugin() {
         
         val ranksyncconfig = CustomConfigManager(this, "ranks.yml")
         RankSyncTask.initialize(this, ranksyncconfig)
-        
-        server.pluginManager.registerEvents(MinecraftPlayerJoinListener(this), this)
-        
-        
+        UserUpdateListener(this)
+
         
         logger.info("CH-Rank Verwaltung wurde erfolgreich gestartet")
     }
@@ -112,7 +109,7 @@ class CraftedHorizonRankManagement : JavaPlugin() {
         try {
             if (this::jda.isInitialized) {
                 try {
-                    jda.shutdown()
+                    jda.shutdownNow()
                     logger.info("Bot wurde erfolgreich heruntergefahren")
                 } catch (e: Exception) {
                     logger.severe("Fehler beim Herunterfahren des Bots: ${e.message}")
@@ -123,6 +120,7 @@ class CraftedHorizonRankManagement : JavaPlugin() {
             logger.severe("Unerwarteter Fehler beim Herunterfahren des Bots: ${e.message}")
             e.printStackTrace()
         }
+        Thread.sleep(2000)
 
         try {
             if (this::dbclient.isInitialized) {

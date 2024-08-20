@@ -32,7 +32,7 @@ class SendRegisterModal : ICommand {
         embed.setDescription(registerEmbedMessage)
         embed.setColor(0x00ff00)
 
-        val button = Button.primary("mcregister", "Registrieren")
+        val button = Button.primary("mcregister", "Minecraft verknüpfen")
         event.channel.sendMessageEmbeds(embed.build()).setActionRow(button).queue()
     }
 

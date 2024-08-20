@@ -1,10 +1,19 @@
 package me.fabichan.craftedHorizonRankManagement.util
 
 import me.fabichan.craftedHorizonRankManagement.CraftedHorizonRankManagement
+import me.fabichan.craftedHorizonRankManagement.util.JDAProvider.jda
+import me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.Companion.syncRoles
+import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.exceptions.HierarchyException
+import net.luckperms.api.LuckPerms
+import net.luckperms.api.event.EventBus
+import net.luckperms.api.event.user.UserDataRecalculateEvent
+import org.bukkit.Bukkit
 import org.bukkit.configuration.file.FileConfiguration
+import org.bukkit.event.Listener
 import org.bukkit.scheduler.BukkitRunnable
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 class RankSyncTask {
@@ -26,41 +35,58 @@ class RankSyncTask {
         private fun reoccurringTask() {
             object : BukkitRunnable() {
                 override fun run() {
-                    val linkedDiscordIds = LinkManager.getAllDiscordsThatAreLinkedAndOnServer()
-                    if (linkedDiscordIds.isNullOrEmpty()) {
-                        pluginInstance.logger.warning("No linked Discord IDs found or none are online.")
-                        return
-                    }
+                    try {
+                        val linkedDiscordIds = LinkManager.getAllDiscordsThatAreLinkedAndOnServer()
+                        if (linkedDiscordIds.isNullOrEmpty()) {
+                            pluginInstance.logger.warning("No linked Discord IDs found or none are online.")
+                            return
+                        }
 
-                    val jda = JDAProvider.jda ?: run {
-                        pluginInstance.logger.severe("JDA not initialized")
-                        return
-                    }
+                        val jda = JDAProvider.jda ?: run {
+                            pluginInstance.logger.severe("JDA not initialized")
+                            return
+                        }
 
-                    val guildId = pluginInstance.config.getString("bot.guildid") ?: run {
-                        pluginInstance.logger.severe("Guild ID not set in config")
-                        return
-                    }
+                        val guildId = pluginInstance.config.getString("bot.guildid") ?: run {
+                            pluginInstance.logger.severe("Guild ID not set in config")
+                            return
+                        }
 
-                    val guild = jda.getGuildById(guildId) ?: run {
-                        pluginInstance.logger.severe("Guild not found for ID: $guildId")
-                        return
-                    }
+                        val guild = jda.getGuildById(guildId) ?: run {
+                            pluginInstance.logger.severe("Guild not found for ID: $guildId")
+                            return
+                        }
 
-                    linkedDiscordIds.forEach { discordId ->
-                        guild.getMemberById(discordId)?.let { member ->
-                            pluginInstance.logger.info("[AutoRankSync] Syncing roles for ${member.id}")
-                            syncRoles(member)
-                        } ?: pluginInstance.logger.warning("Member with Discord ID $discordId not found in guild $guildId.")
+                        linkedDiscordIds.forEach { discordId ->
+                            guild.getMemberById(discordId)?.let { member ->
+                                pluginInstance.logger.info("[AutoRankSync] Syncing roles for ${member.id}")
+                                
+                                Bukkit.getScheduler().runTaskAsynchronously(pluginInstance, Runnable {
+                                    try {
+                                        syncRoles(member)
+                                    } catch (e: Exception) {
+                                        pluginInstance.logger.severe("Failed to sync roles for ${member.id}: ${e.message}")
+                                        e.printStackTrace()
+                                    }
+                                })
+                            } ?: pluginInstance.logger.warning("Member with Discord ID $discordId not found in guild $guildId.")
+                        }
+                    } catch (e: Exception) {
+                        pluginInstance.logger.severe("An error occurred during the reoccurring task: ${e.message}")
+                        e.printStackTrace()
                     }
                 }
             }.runTaskTimer(pluginInstance, 0, timerDuration)
         }
 
+
         @JvmStatic
         fun syncRoles(member: Member) {
             try {
                 val isLinked = LinkManager.isLinked(member.idLong)
+                if (!isLinked) {
+                    return
+                }
                 rolePermissions.forEach { (permission, roleId) ->
                     val role = member.guild.getRoleById(roleId)
                     if (role == null) {
@@ -69,7 +95,7 @@ class RankSyncTask {
                     }
 
                     hasPermission(member, permission) { hasPermission ->
-                        if (isLinked && hasPermission) {
+                        if (hasPermission) {
                             if (!member.roles.contains(role)) {
                                 member.guild.addRoleToMember(member, role).queue(
                                     { pluginInstance.logger.info("Added role ${role.id} to member ${member.id}") },
@@ -147,5 +173,46 @@ class RankSyncTask {
             } ?: pluginInstance.logger.warning("No ranks section found in the configuration.")
             return rolePermissions
         }
+    }
+}
+
+class UserUpdateListener(private val plugin: CraftedHorizonRankManagement) : Listener {
+
+    init {
+        registerEvents()
+    }
+
+    private fun registerEvents() {
+        val luckPerms = plugin.server.servicesManager.load(LuckPerms::class.java)
+        val eventBus: EventBus = luckPerms?.eventBus ?: run {
+            plugin.logger.severe("LuckPerms event bus not available.")
+            return
+        }
+        
+        eventBus.subscribe(plugin, UserDataRecalculateEvent::class.java, this::onUserDataRecalculate)
+    }
+    
+    private fun onUserDataRecalculate(event: UserDataRecalculateEvent) {
+        performActionOnUserUpdate(event)
+    }
+
+    private fun performActionOnUserUpdate(event: UserDataRecalculateEvent) {
+        object : BukkitRunnable() {
+            override fun run() {
+                if (jda == null) {
+                    plugin.logger.severe("JDA ist nicht initialisiert!")
+                    return
+                }
+                val uuid = event.user.uniqueId
+                val discordId = LinkManager.getDiscordId(uuid) ?: return
+                val member = jda!!.getGuildById(
+                    Objects.requireNonNull<String>(
+                        plugin.config.getString("bot.guildid")
+                    )
+                )?.getMemberById(discordId)
+                    ?: return
+                syncRoles(member)
+            }
+        }.runTaskAsynchronously(plugin)
     }
 }
