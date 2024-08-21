@@ -1,10 +1,10 @@
 package me.fabichan.craftedHorizonRankManagement.util
 
 import me.fabichan.craftedHorizonRankManagement.CraftedHorizonRankManagement
-import me.fabichan.craftedHorizonRankManagement.util.JDAProvider.jda
+import me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.Companion.invalidateCachesForMember
 import me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.Companion.syncRoles
-import net.dv8tion.jda.api.entities.Guild
 import net.dv8tion.jda.api.entities.Member
+import net.dv8tion.jda.api.entities.Role
 import net.dv8tion.jda.api.exceptions.HierarchyException
 import net.luckperms.api.LuckPerms
 import net.luckperms.api.event.EventBus
@@ -13,7 +13,6 @@ import org.bukkit.Bukkit
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.event.Listener
 import org.bukkit.scheduler.BukkitRunnable
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 class RankSyncTask {
@@ -22,14 +21,41 @@ class RankSyncTask {
         private lateinit var pluginInstance: CraftedHorizonRankManagement
         private lateinit var rolePermissions: Map<String, String>
         private lateinit var rankConfig: CustomConfigManager
+        private var isInited = false
         private var timerDuration: Long = 20 * 60 // Default 60 seconds
+        
+        private val memberCache = ConcurrentHashMap<Long, Member?>()
+        private val roleCache = ConcurrentHashMap<String, Role?>()
+        private val permissionCache = ConcurrentHashMap<String, Boolean>()
 
         fun initialize(plugin: CraftedHorizonRankManagement, config: CustomConfigManager) {
+            if (isInited) {
+                pluginInstance.logger.warning("RankSyncTask already initialized.")
+                return
+            }
             pluginInstance = plugin
             rankConfig = config
-            rolePermissions = loadRolePermissions()
+            rolePermissions = try {
+                loadRolePermissions()
+            } catch (e: Exception) {
+                pluginInstance.logger.severe("Failed to load role permissions: ${e.message}")
+                emptyMap()
+            }
             timerDuration = 20L * pluginInstance.config.getInt("bot.ranksynctimer", 60) // 20 ticks = 1 second
-            reoccurringTask()
+
+            if (rolePermissions.isNotEmpty()) {
+                reoccurringTask()
+            } else {
+                pluginInstance.logger.severe("Role permissions are empty. Task will not start.")
+            }
+            isInited = true
+        }
+        
+        fun invalidateCachesForMember(member: Member) {
+            if (memberCache.containsKey(member.idLong)){
+                memberCache.remove(member.idLong)
+            }
+            permissionCache.keys.removeIf { it.startsWith("${member.id}-") }
         }
 
         private fun reoccurringTask() {
@@ -58,9 +84,13 @@ class RankSyncTask {
                         }
 
                         linkedDiscordIds.forEach { discordId ->
-                            guild.getMemberById(discordId)?.let { member ->
+                            val member = memberCache.computeIfAbsent(discordId) {
+                                guild.getMemberById(discordId)
+                            }
+
+                            if (member != null) {
                                 pluginInstance.logger.info("[AutoRankSync] Syncing roles for ${member.id}")
-                                
+
                                 Bukkit.getScheduler().runTaskAsynchronously(pluginInstance, Runnable {
                                     try {
                                         syncRoles(member)
@@ -69,61 +99,105 @@ class RankSyncTask {
                                         e.printStackTrace()
                                     }
                                 })
-                            } ?: pluginInstance.logger.warning("Member with Discord ID $discordId not found in guild $guildId.")
+                            } else {
+                                pluginInstance.logger.warning("Member with Discord ID $discordId not found in guild $guildId.")
+                            }
                         }
                     } catch (e: Exception) {
                         pluginInstance.logger.severe("An error occurred during the reoccurring task: ${e.message}")
                         e.printStackTrace()
                     }
                 }
-            }.runTaskTimer(pluginInstance, 0, timerDuration)
+            }.runTaskTimer(pluginInstance, 200, timerDuration)
         }
-
 
         @JvmStatic
         fun syncRoles(member: Member) {
             try {
                 val isLinked = LinkManager.isLinked(member.idLong)
                 if (!isLinked) {
+                    pluginInstance.logger.warning("Member ${member.id} is not linked.")
                     return
                 }
+
                 rolePermissions.forEach { (permission, roleId) ->
-                    val role = member.guild.getRoleById(roleId)
+                    val role = roleCache.computeIfAbsent(roleId) {
+                        member.guild.getRoleById(roleId)
+                    }
+
                     if (role == null) {
                         pluginInstance.logger.warning("Role with ID $roleId not found in guild ${member.guild.id}")
                         return@forEach
                     }
 
-                    hasPermission(member, permission) { hasPermission ->
-                        if (hasPermission) {
-                            if (!member.roles.contains(role)) {
-                                member.guild.addRoleToMember(member, role).queue(
-                                    { pluginInstance.logger.info("Added role ${role.id} to member ${member.id}") },
-                                    { exception -> pluginInstance.logger.warning("Failed to add role ${role.id} to member ${member.id}: ${exception.message}") }
-                                )
-                            }
-                        } else {
-                            if (member.roles.contains(role)) {
-                                member.guild.removeRoleFromMember(member, role).queue(
-                                    { pluginInstance.logger.info("Removed role ${role.id} from member ${member.id}") },
-                                    { exception -> pluginInstance.logger.warning("Failed to remove role ${role.id} from member ${member.id}: ${exception.message}") }
-                                )
-                            }
+                    val cacheKey = "${member.id}-$permission"
+                    val hasPermission = permissionCache[cacheKey]
+
+                    if (hasPermission == null) {
+                        hasPermission(member, permission) { permissionResult ->
+                            permissionCache[cacheKey] = permissionResult
+                            handleRoleAssignment(member, role, permissionResult)
                         }
+                    } else {
+                        handleRoleAssignment(member, role, hasPermission)
                     }
                 }
             } catch (e: HierarchyException) {
-                pluginInstance.logger.warning("Failed to modify roles for member ${member.id}: ${e.message}")
+                pluginInstance.logger.warning("Failed to modify roles for member ${member.id} due to hierarchy issue: ${e.message}")
             } catch (e: Exception) {
                 pluginInstance.logger.severe("Unexpected error during role sync for member ${member.id}: ${e.message}")
+                e.printStackTrace()
             }
         }
+        
+        @Suppress("USELESS_IS_CHECK")
+        private fun handleRoleAssignment(member: Member, role: Role, hasPermission: Boolean) {
+            synchronized(member) {
+                try {
+                    val shouldAddRole = hasPermission && !member.roles.contains(role)
+                    val shouldRemoveRole = !hasPermission && member.roles.contains(role)
+
+                    if (shouldAddRole || shouldRemoveRole) {
+                        Bukkit.getScheduler().runTaskAsynchronously(pluginInstance, Runnable {
+                            try {
+                                if (shouldAddRole) {
+                                    member.guild.addRoleToMember(member, role).queue(
+                                        { pluginInstance.logger.info("Added role ${role.id} to member ${member.id}") },
+                                        { exception -> pluginInstance.logger.warning("Failed to add role ${role.id} to member ${member.id}: ${exception.message}") }
+                                    )
+                                } else if (shouldRemoveRole) {
+                                    member.guild.removeRoleFromMember(member, role).queue(
+                                        { pluginInstance.logger.info("Removed role ${role.id} from member ${member.id}") },
+                                        { exception -> pluginInstance.logger.warning("Failed to remove role ${role.id} from member ${member.id}: ${exception.message}") }
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                pluginInstance.logger.severe("Error while assigning roles to member ${member.id}: ${e.message}")
+                                e.printStackTrace()
+                            }
+                        })
+                    }
+                } catch (e: Exception) {
+                    pluginInstance.logger.severe("Error while checking roles for member ${member.id}: ${e.message}")
+                    e.printStackTrace()
+                }
+            }
+        }
+
+
+
 
         private fun hasPermission(member: Member, permission: String, callback: (Boolean) -> Unit) {
             object : BukkitRunnable() {
                 override fun run() {
                     try {
                         val mcId = LinkManager.getMinecraftUuid(member.idLong)
+                        if (mcId == null) {
+                            pluginInstance.logger.warning("No Minecraft UUID found for member ${member.id}")
+                            callback(false)
+                            return
+                        }
+
                         val lpProvider = pluginInstance.server.servicesManager.getRegistration(net.luckperms.api.LuckPerms::class.java)?.provider
                         val userManager = lpProvider?.userManager ?: run {
                             pluginInstance.logger.warning("LuckPerms user manager not available.")
@@ -153,6 +227,7 @@ class RankSyncTask {
                         }.runTask(pluginInstance)
                     } catch (e: Exception) {
                         pluginInstance.logger.severe("Error checking permission for member ${member.id}: ${e.message}")
+                        e.printStackTrace()
                         callback(false)
                     }
                 }
@@ -162,19 +237,25 @@ class RankSyncTask {
         private fun loadRolePermissions(): Map<String, String> {
             val config: FileConfiguration = rankConfig.config
             val rolePermissions = ConcurrentHashMap<String, String>()
-            config.getConfigurationSection("ranks")?.getKeys(false)?.forEach { rank ->
-                val permission = config.getString("ranks.$rank.permission")
-                val roleId = config.getString("ranks.$rank.roleId")
-                if (permission != null && roleId != null) {
-                    rolePermissions[permission] = roleId
-                } else {
-                    pluginInstance.logger.warning("Rank $rank has missing permission or roleId in the configuration.")
-                }
-            } ?: pluginInstance.logger.warning("No ranks section found in the configuration.")
+            try {
+                config.getConfigurationSection("ranks")?.getKeys(false)?.forEach { rank ->
+                    val permission = config.getString("ranks.$rank.permission")
+                    val roleId = config.getString("ranks.$rank.roleId")
+                    if (permission != null && roleId != null) {
+                        rolePermissions[permission] = roleId
+                    } else {
+                        pluginInstance.logger.warning("Rank $rank has missing permission or roleId in the configuration.")
+                    }
+                } ?: pluginInstance.logger.warning("No ranks section found in the configuration.")
+            } catch (e: Exception) {
+                pluginInstance.logger.severe("Failed to load role permissions: ${e.message}")
+                e.printStackTrace()
+            }
             return rolePermissions
         }
     }
 }
+
 
 class UserUpdateListener(private val plugin: CraftedHorizonRankManagement) : Listener {
 
@@ -188,10 +269,10 @@ class UserUpdateListener(private val plugin: CraftedHorizonRankManagement) : Lis
             plugin.logger.severe("LuckPerms event bus not available.")
             return
         }
-        
+
         eventBus.subscribe(plugin, UserDataRecalculateEvent::class.java, this::onUserDataRecalculate)
     }
-    
+
     private fun onUserDataRecalculate(event: UserDataRecalculateEvent) {
         performActionOnUserUpdate(event)
     }
@@ -199,18 +280,19 @@ class UserUpdateListener(private val plugin: CraftedHorizonRankManagement) : Lis
     private fun performActionOnUserUpdate(event: UserDataRecalculateEvent) {
         object : BukkitRunnable() {
             override fun run() {
+                val jda = JDAProvider.jda
                 if (jda == null) {
                     plugin.logger.severe("JDA ist nicht initialisiert!")
                     return
                 }
+
                 val uuid = event.user.uniqueId
                 val discordId = LinkManager.getDiscordId(uuid) ?: return
-                val member = jda!!.getGuildById(
-                    Objects.requireNonNull<String>(
-                        plugin.config.getString("bot.guildid")
-                    )
-                )?.getMemberById(discordId)
-                    ?: return
+                val guild = jda.getGuildById(plugin.config.getString("bot.guildid") ?: return)
+                val member = guild?.getMemberById(discordId) ?: return
+                
+                invalidateCachesForMember(member)
+                
                 syncRoles(member)
             }
         }.runTaskAsynchronously(plugin)

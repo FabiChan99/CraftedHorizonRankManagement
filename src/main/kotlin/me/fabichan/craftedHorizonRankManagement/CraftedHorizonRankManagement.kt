@@ -55,6 +55,7 @@ class CraftedHorizonRankManagement : JavaPlugin() {
                 .setMemberCachePolicy(MemberCachePolicy.ALL)
                 .build()
             jda.awaitReady()
+            Thread.sleep(2000)
             JDAProvider.initialize(jda)
             logger.info("Bot wurde erfolgreich gestartet")
             logger.info("Bot-Name: ${jda.selfUser.name}")
