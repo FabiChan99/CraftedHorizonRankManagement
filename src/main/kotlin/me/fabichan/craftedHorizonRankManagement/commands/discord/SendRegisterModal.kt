@@ -28,7 +28,6 @@ class SendRegisterModal : ICommand {
         event.deferReply().queue()
         val embed = EmbedBuilder()
         val registerEmbedMessage = MessageConfigManager.getMessage("discord.registerEmbedMessage")
-        embed.setTitle("CraftedHorizon Rangsync")
         embed.setDescription(registerEmbedMessage)
         embed.setColor(0x00ff00)
 
