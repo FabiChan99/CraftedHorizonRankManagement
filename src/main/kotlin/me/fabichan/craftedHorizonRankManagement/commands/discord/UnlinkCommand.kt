@@ -21,7 +21,7 @@ class UnlinkCommand : ICommand {
     }
 
     override fun handle(event: SlashCommandInteractionEvent) {
-        val user = Objects.requireNonNull(event.getOption("user"))?.asUser
+        val user = event.getOption("user")?.asUser
         val isL = LinkManager.isLinked(user!!.idLong)
         if (!isL) {
             event.reply("Der Benutzer ist nicht verlinkt!").setEphemeral(true).queue()
