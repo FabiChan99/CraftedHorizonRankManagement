@@ -1,24 +1,44 @@
 package me.fabichan.craftedHorizonRankManagement.util
 
+import com.google.gson.Gson
+import io.ktor.server.application.*
+import io.ktor.server.engine.*
+import io.ktor.server.netty.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.util.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import me.fabichan.craftedHorizonRankManagement.CraftedHorizonRankManagement
 import me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.Companion.invalidateCachesForMember
+import me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.Companion.pluginInstance
 import me.fabichan.craftedHorizonRankManagement.util.RankSyncTask.Companion.syncRoles
 import net.dv8tion.jda.api.entities.Member
 import net.dv8tion.jda.api.entities.Role
 import net.dv8tion.jda.api.exceptions.HierarchyException
 import net.luckperms.api.LuckPerms
+import net.luckperms.api.LuckPermsProvider
 import net.luckperms.api.event.EventBus
 import net.luckperms.api.event.user.UserDataRecalculateEvent
+import net.luckperms.api.model.group.Group
+import net.luckperms.api.model.user.User
+import net.luckperms.api.node.matcher.NodeMatcher
+import net.luckperms.api.node.types.InheritanceNode
 import org.bukkit.Bukkit
 import org.bukkit.configuration.file.FileConfiguration
 import org.bukkit.event.Listener
 import org.bukkit.scheduler.BukkitRunnable
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
+
 
 class RankSyncTask {
 
     companion object {
-        private lateinit var pluginInstance: CraftedHorizonRankManagement
+        lateinit var pluginInstance: CraftedHorizonRankManagement
         private lateinit var rolePermissions: Map<String, String>
         private lateinit var rankConfig: CustomConfigManager
         private var isInited = false
@@ -256,6 +276,126 @@ class RankSyncTask {
     }
 }
 
+class RankApiUtils {
+
+    companion object {
+        private val webTeamMember = HashSet<WebApiField>()
+
+        fun initialize() {
+            scheduleWebTeamMemberUpdates()
+            runKtorServer()
+            pluginInstance.logger.info("RankApiUtils initialized.")
+        }
+        
+
+        private fun runKtorServer() {
+            object : BukkitRunnable() {
+                override fun run() {
+                    runKtorInSubThread()
+                }
+            }.runTaskAsynchronously(pluginInstance)
+        }
+
+        private fun scheduleWebTeamMemberUpdates() {
+            object : BukkitRunnable() {
+                override fun run() {
+                    // Run asynchronously without blocking the main server thread
+                    CompletableFuture.runAsync {
+                        updateWebTeamMembers()
+                    }
+                }
+            }.runTaskTimer(pluginInstance, 0, 20 * 60 * 5) // Runs every 5 minutes
+        }
+        
+
+        private fun updateWebTeamMembers() {
+            if (!checkLuckPermsAvailability()) return
+
+            val allowedRoles = listOf("inhaber", "teamleitung", "admin", "moderator", "supporter", "builder", "helfer")
+            val lpProvider = pluginInstance.server.servicesManager.getRegistration(net.luckperms.api.LuckPerms::class.java)?.provider
+                ?: run {
+                    pluginInstance.logger.warning("LuckPerms provider is not available.")
+                    return
+                }
+            
+            webTeamMember.clear()
+            lpProvider.groupManager.loadAllGroups().join()
+            for (role in allowedRoles) {
+                val group = lpProvider.groupManager.getGroup(role)
+                if (group != null) {
+                    val users = getUsersInGroup(role)
+                    for (user in users) {
+                        addUserToWebTeamMembers(user, group)
+                    }
+                }
+            }
+        }
+
+        private fun getUsersInGroup(groupName: String): List<User> {
+            val api = LuckPermsProvider.get()
+            val group: Group? = api.groupManager.getGroup(groupName)
+            requireNotNull(group) { "Group $groupName not found" }
+            val userManager = api.userManager
+            val users: MutableList<User> = ArrayList()
+            for (uuid in userManager.searchAll<InheritanceNode>(
+                NodeMatcher.key<InheritanceNode>(
+                    InheritanceNode.builder(
+                        group
+                    ).build()
+                )
+            ).join().keys) {
+                val user =
+                    if (userManager.isLoaded(uuid)) userManager.getUser(uuid) else userManager.loadUser(uuid).join()
+                checkNotNull(user) { "Could not load data of $uuid" }
+                users.add(user)
+            }
+            
+            
+            return users
+        }
+
+        private fun checkLuckPermsAvailability(): Boolean {
+            return pluginInstance.server.servicesManager.getRegistration(net.luckperms.api.LuckPerms::class.java) != null
+        }
+
+        private fun addUserToWebTeamMembers(user: net.luckperms.api.model.user.User, group: net.luckperms.api.model.group.Group) {
+            val playerName = user.username
+            val mcuuid = user.uniqueId
+            val rankWeight = group.weight.orElse(0)
+            val rankName = group.name ?: "Spieler"
+
+            playerName?.let {
+                // if already UUID in the list, don't add again
+                if (webTeamMember.any { it.mcuuid == mcuuid.toString() }) return@let
+                webTeamMember.add(WebApiField(it, mcuuid.toString(), rankWeight, rankName))
+            }
+        }
+
+        private fun runKtorInSubThread() {
+            val server = embeddedServer(Netty, port = 4001) {
+                routing {
+                    get("/team") {
+                        try {
+                            val sendString = withContext(Dispatchers.IO) {
+                                val prettyJson = Json { prettyPrint = true }
+                                prettyJson.encodeToString(webTeamMember)
+                            }
+                            call.respondText(sendString)
+                        } catch (e: Exception) {
+                            pluginInstance.logger.severe("Error in Ktor server: ${e.message}")
+                            call.respondText("Error generating team data: ${e.message}")
+                        }
+                    }
+                }
+            }
+            server.start(wait = true)
+        }
+    }
+}
+
+
+@Serializable
+data class WebApiField(val playerName: String, val mcuuid: String, val rankWeight: Int, val rankName: String)
 
 class UserUpdateListener(private val plugin: CraftedHorizonRankManagement) : Listener {
 

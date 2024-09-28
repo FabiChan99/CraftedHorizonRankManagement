@@ -99,6 +99,7 @@ class CraftedHorizonRankManagement : JavaPlugin() {
         val ranksyncconfig = CustomConfigManager(this, "ranks.yml")
         RankSyncTask.initialize(this, ranksyncconfig)
         UserUpdateListener(this)
+        RankApiUtils.initialize()
 
         
         logger.info("CH-Rank Verwaltung wurde erfolgreich gestartet")

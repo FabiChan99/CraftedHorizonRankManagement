@@ -13,7 +13,8 @@
 
     <properties>
         <java.version>17</java.version>
-        <kotlin.version>2.0.10</kotlin.version>
+        <kotlin.version>2.0.20</kotlin.version>
+        <serialization.version>1.7.3</serialization.version> <!-- Kotlinx Serialization version -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -21,6 +22,7 @@
         <defaultGoal>clean package</defaultGoal>
         <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
         <plugins>
+            <!-- Kotlin Plugin -->
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
                 <artifactId>kotlin-maven-plugin</artifactId>
@@ -35,9 +37,20 @@
                     </execution>
                 </executions>
                 <configuration>
-                    <jvmTarget>${java.version}</jvmTarget>
+                    <compilerPlugins>
+                        <plugin>kotlinx-serialization</plugin>
+                    </compilerPlugins>
                 </configuration>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.jetbrains.kotlin</groupId>
+                        <artifactId>kotlin-maven-serialization</artifactId>
+                        <version>${kotlin.version}</version>
+                    </dependency>
+                </dependencies>
             </plugin>
+
+            <!-- Maven Shade Plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -59,6 +72,8 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <!-- Maven Antrun Plugin -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
@@ -78,7 +93,8 @@
                     </execution>
                 </executions>
             </plugin>
-        </plugins>        
+        </plugins>
+
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -99,36 +115,87 @@
     </repositories>
 
     <dependencies>
+        <!-- LuckPerms Dependency -->
         <dependency>
             <groupId>net.luckperms</groupId>
             <artifactId>api</artifactId>
             <version>5.4</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- MariaDB JDBC Dependency -->
         <dependency>
             <groupId>org.mariadb.jdbc</groupId>
             <artifactId>mariadb-java-client</artifactId>
             <version>3.4.1</version>
             <scope>compile</scope>
         </dependency>
+
+        <!-- HikariCP Dependency -->
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
             <version>5.1.0</version>
             <scope>compile</scope>
         </dependency>
+
+        <!-- Ktor Dependencies -->
         <dependency>
-            <groupId>net.dv8tion</groupId>
-            <artifactId>JDA</artifactId>
-            <version>5.0.2</version>
+            <groupId>io.ktor</groupId>
+            <artifactId>ktor-server-netty</artifactId>
+            <version>2.3.12</version>
             <scope>compile</scope>
         </dependency>
+        <dependency>
+            <groupId>io.ktor</groupId>
+            <artifactId>ktor-server-core</artifactId>
+            <version>2.3.12</version>
+        </dependency>
+        <dependency>
+            <groupId>io.ktor</groupId>
+            <artifactId>ktor-server-core-jvm</artifactId>
+            <version>2.3.12</version>
+        </dependency>
+        <dependency>
+            <groupId>io.ktor</groupId>
+            <artifactId>ktor-serialization-kotlinx-json</artifactId>
+            <version>2.3.12</version>
+        </dependency>
+        <dependency>
+            <groupId>io.ktor</groupId>
+            <artifactId>ktor-server-netty-jvm</artifactId>
+            <version>2.3.12</version>
+        </dependency>
+        <dependency>
+            <groupId>io.ktor</groupId>
+            <artifactId>ktor-server-content-negotiation</artifactId>
+            <version>2.3.12</version>
+        </dependency>
+
+        <!-- Kotlinx Serialization Dependencies -->
+        <dependency>
+            <groupId>org.jetbrains.kotlinx</groupId>
+            <artifactId>kotlinx-serialization-json</artifactId>
+            <version>${serialization.version}</version> <!-- Serialization version from properties -->
+        </dependency>
+
+        <!-- PaperMC Dependency -->
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>1.20.4-R0.1-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+
+        <!-- JDA Dependency -->
+        <dependency>
+            <groupId>net.dv8tion</groupId>
+            <artifactId>JDA</artifactId>
+            <version>5.0.2</version>
+            <scope>compile</scope>
+        </dependency>
+
+        <!-- Kotlin Standard Library -->
         <dependency>
             <groupId>org.jetbrains.kotlin</groupId>
             <artifactId>kotlin-stdlib-jdk8</artifactId>
