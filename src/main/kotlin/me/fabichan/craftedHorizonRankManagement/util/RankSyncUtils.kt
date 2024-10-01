@@ -279,7 +279,7 @@ class RankSyncTask {
 class RankApiUtils {
 
     companion object {
-        private val webTeamMember = HashSet<WebApiField>()
+        private val webTeamMember = ArrayList<WebApiField>()
 
         fun initialize() {
             scheduleWebTeamMemberUpdates()
@@ -358,16 +358,50 @@ class RankApiUtils {
             return pluginInstance.server.servicesManager.getRegistration(net.luckperms.api.LuckPerms::class.java) != null
         }
 
+        private fun extractFirstColorCode(input: String): Char? {
+            val regex = Regex("&([0-9a-f])")
+            val matchResult = regex.find(input)
+            return matchResult?.groupValues?.get(1)?.firstOrNull()
+        }
+
+        private fun mcColorCodeToHex(colorCode: Char): String {
+            val colorMap = mapOf(
+                '0' to "#000000", // Black
+                '1' to "#0000AA", // Dark Blue
+                '2' to "#00AA00", // Dark Green
+                '3' to "#00AAAA", // Dark Aqua
+                '4' to "#AA0000", // Dark Red
+                '5' to "#AA00AA", // Dark Purple
+                '6' to "#FFAA00", // Gold
+                '7' to "#AAAAAA", // Gray
+                '8' to "#555555", // Dark Gray
+                '9' to "#5555FF", // Blue
+                'a' to "#55FF55", // Green
+                'b' to "#55FFFF", // Aqua
+                'c' to "#FF5555", // Red
+                'd' to "#FF55FF", // Light Purple
+                'e' to "#FFFF55", // Yellow
+                'f' to "#FFFFFF"  // White
+            )
+
+            return colorMap[colorCode] ?: "#FFFFFF" // Default to white if not found
+        }
+
         private fun addUserToWebTeamMembers(user: net.luckperms.api.model.user.User, group: net.luckperms.api.model.group.Group) {
-            val playerName = user.username
+            val playerName = user.friendlyName 
             val mcuuid = user.uniqueId
             val rankWeight = group.weight.orElse(0)
-            val rankName = group.name ?: "Spieler"
+            val rankDisplayName = group.displayName ?: group.name
+            val perms = group.nodes ?: emptyList()
+            var colorCode = perms.firstOrNull { it.key.startsWith("prefix") }?.key?.let { extractFirstColorCode(it) }.toString()
+            colorCode = mcColorCodeToHex(colorCode.firstOrNull() ?: 'f')
+            
+            val rankName = group.name ?: "Einwohner"
 
-            playerName?.let {
+            playerName.let { player ->
                 // if already UUID in the list, don't add again
-                if (webTeamMember.any { it.mcuuid == mcuuid.toString() }) return@let
-                webTeamMember.add(WebApiField(it, mcuuid.toString(), rankWeight, rankName))
+                if (webTeamMember.any { it.uuid == mcuuid.toString() }) return@let
+                webTeamMember.add(WebApiField(player, mcuuid.toString(), rankDisplayName, rankWeight, colorCode,  rankName))
             }
         }
 
@@ -395,7 +429,7 @@ class RankApiUtils {
 
 
 @Serializable
-data class WebApiField(val playerName: String, val mcuuid: String, val rankWeight: Int, val rankName: String)
+data class WebApiField(val playerName: String, val uuid: String, val rankDisplayName: String , val rankWeight: Int, val rankColor: String ,val rankName: String)
 
 class UserUpdateListener(private val plugin: CraftedHorizonRankManagement) : Listener {
 
