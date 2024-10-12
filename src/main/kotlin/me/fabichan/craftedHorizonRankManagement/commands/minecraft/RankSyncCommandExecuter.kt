@@ -11,8 +11,8 @@ import org.bukkit.entity.Player
 
 class RankSyncCommandExecuter(private val plugin: CraftedHorizonRankManagement): CommandExecutor {
 
-    override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>?): Boolean {
-        if (args.isNullOrEmpty()) {
+    override fun onCommand(sender: CommandSender, command: Command, label: String, args: Array<out String>): Boolean {
+        if (args.isEmpty()) {
             handleRankSync(sender, args)
         } else {
             sender.sendMessage("${ChatPrefix}${ChatColor.RED}Commandusage: ${ChatColor.GOLD}/ranksync")

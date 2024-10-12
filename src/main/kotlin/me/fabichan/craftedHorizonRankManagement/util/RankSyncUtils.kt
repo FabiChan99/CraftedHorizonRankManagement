@@ -1,12 +1,13 @@
 package me.fabichan.craftedHorizonRankManagement.util
 
 import com.google.gson.Gson
+import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -407,6 +408,12 @@ class RankApiUtils {
 
         private fun runKtorInSubThread() {
             val server = embeddedServer(Netty, port = 4001) {
+                install(CORS) {
+                    allowMethod(HttpMethod.Get)
+                    allowHeader(HttpHeaders.ContentType)
+                    allowHeader(HttpHeaders.AccessControlAllowOrigin)
+                    anyHost()
+                }
                 routing {
                     get("/team") {
                         try {
@@ -414,7 +421,7 @@ class RankApiUtils {
                                 val prettyJson = Json { prettyPrint = true }
                                 prettyJson.encodeToString(webTeamMember)
                             }
-                            call.respondText(sendString)
+                            call.respondText(sendString, ContentType.Application.Json, HttpStatusCode.OK)
                         } catch (e: Exception) {
                             pluginInstance.logger.severe("Error in Ktor server: ${e.message}")
                             call.respondText("Error generating team data: ${e.message}")

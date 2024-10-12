@@ -143,33 +143,38 @@
         <dependency>
             <groupId>io.ktor</groupId>
             <artifactId>ktor-server-netty</artifactId>
-            <version>2.3.12</version>
+            <version>3.0.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>io.ktor</groupId>
             <artifactId>ktor-server-core</artifactId>
-            <version>2.3.12</version>
+            <version>3.0.0</version>
         </dependency>
         <dependency>
             <groupId>io.ktor</groupId>
             <artifactId>ktor-server-core-jvm</artifactId>
-            <version>2.3.12</version>
+            <version>3.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.ktor</groupId>
+            <artifactId>ktor-server-cors-jvm</artifactId>
+            <version>3.0.0</version>
         </dependency>
         <dependency>
             <groupId>io.ktor</groupId>
             <artifactId>ktor-serialization-kotlinx-json</artifactId>
-            <version>2.3.12</version>
+            <version>3.0.0</version>
         </dependency>
         <dependency>
             <groupId>io.ktor</groupId>
             <artifactId>ktor-server-netty-jvm</artifactId>
-            <version>2.3.12</version>
+            <version>3.0.0</version>
         </dependency>
         <dependency>
             <groupId>io.ktor</groupId>
             <artifactId>ktor-server-content-negotiation</artifactId>
-            <version>2.3.12</version>
+            <version>3.0.0</version>
         </dependency>
 
         <!-- Kotlinx Serialization Dependencies -->
